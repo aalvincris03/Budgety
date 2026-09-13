@@ -1,0 +1,67 @@
+1<?xml version="1.0" encoding="utf-8"?>
+2<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+3    package="com.budgety.myapp"
+4    android:versionCode="1"
+5    android:versionName="1.0" >
+6
+7    <uses-sdk
+8        android:minSdkVersion="23"
+8-->/storage/internal_new/project/wheres_my_moneys/app/src/main/AndroidManifest.xml
+9        android:targetSdkVersion="29" />
+9-->/storage/internal_new/project/wheres_my_moneys/app/src/main/AndroidManifest.xml
+10
+11    <application
+11-->/storage/internal_new/project/wheres_my_moneys/app/src/main/AndroidManifest.xml:4:4-27:19
+12        android:allowBackup="true"
+12-->/storage/internal_new/project/wheres_my_moneys/app/src/main/AndroidManifest.xml:5:9-35
+13        android:appComponentFactory="androidx.core.app.CoreComponentFactory"
+13-->[androidx.core:core:1.3.2] /home/test/.gradle/caches/transforms-2/files-2.1/9ed553dfe45a82aa6b67a31127e18066/core-1.3.2/AndroidManifest.xml:24:18-86
+14        android:debuggable="true"
+15        android:icon="@mipmap/ic_launcher"
+15-->/storage/internal_new/project/wheres_my_moneys/app/src/main/AndroidManifest.xml:6:9-43
+16        android:label="@string/app_name"
+16-->/storage/internal_new/project/wheres_my_moneys/app/src/main/AndroidManifest.xml:7:9-41
+17        android:roundIcon="@mipmap/ic_launcher_round"
+17-->/storage/internal_new/project/wheres_my_moneys/app/src/main/AndroidManifest.xml:8:9-54
+18        android:supportsRtl="true"
+18-->/storage/internal_new/project/wheres_my_moneys/app/src/main/AndroidManifest.xml:9:9-35
+19        android:theme="@style/AppTheme" >
+19-->/storage/internal_new/project/wheres_my_moneys/app/src/main/AndroidManifest.xml:10:9-40
+20        <activity android:name="com.budgety.myapp.MainActivity" >
+20-->/storage/internal_new/project/wheres_my_moneys/app/src/main/AndroidManifest.xml:11:9-17:20
+20-->/storage/internal_new/project/wheres_my_moneys/app/src/main/AndroidManifest.xml:11:19-47
+21            <intent-filter>
+21-->/storage/internal_new/project/wheres_my_moneys/app/src/main/AndroidManifest.xml:12:13-16:29
+22                <action android:name="android.intent.action.MAIN" />
+22-->/storage/internal_new/project/wheres_my_moneys/app/src/main/AndroidManifest.xml:13:17-69
+22-->/storage/internal_new/project/wheres_my_moneys/app/src/main/AndroidManifest.xml:13:25-66
+23
+24                <category android:name="android.intent.category.LAUNCHER" />
+24-->/storage/internal_new/project/wheres_my_moneys/app/src/main/AndroidManifest.xml:15:17-77
+24-->/storage/internal_new/project/wheres_my_moneys/app/src/main/AndroidManifest.xml:15:27-74
+25            </intent-filter>
+26        </activity>
+27
+28        <receiver
+28-->/storage/internal_new/project/wheres_my_moneys/app/src/main/AndroidManifest.xml:18:3-25:20
+29            android:name="com.budgety.myapp.BudgetWidgetProvider"
+29-->/storage/internal_new/project/wheres_my_moneys/app/src/main/AndroidManifest.xml:18:13-49
+30            android:exported="true" >
+30-->/storage/internal_new/project/wheres_my_moneys/app/src/main/AndroidManifest.xml:18:50-73
+31            <intent-filter>
+31-->/storage/internal_new/project/wheres_my_moneys/app/src/main/AndroidManifest.xml:19:13-21:29
+32                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+32-->/storage/internal_new/project/wheres_my_moneys/app/src/main/AndroidManifest.xml:20:17-84
+32-->/storage/internal_new/project/wheres_my_moneys/app/src/main/AndroidManifest.xml:20:25-81
+33            </intent-filter>
+34
+35            <meta-data
+35-->/storage/internal_new/project/wheres_my_moneys/app/src/main/AndroidManifest.xml:22:13-24:62
+36                android:name="android.appwidget.provider"
+36-->/storage/internal_new/project/wheres_my_moneys/app/src/main/AndroidManifest.xml:23:17-58
+37                android:resource="@xml/budget_widget_info" />
+37-->/storage/internal_new/project/wheres_my_moneys/app/src/main/AndroidManifest.xml:24:17-59
+38        </receiver>
+39    </application>
+40
+41</manifest>
