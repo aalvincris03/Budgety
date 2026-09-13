@@ -4,11 +4,9 @@ import android.content.ContentValues
 import android.content.Context
 import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteOpenHelper
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 
 class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME, null, DATABASE_VERSION) {
+    private val auditLogDatabase = AuditLogDatabaseHelper(context.applicationContext)
 
     companion object {
         private const val DATABASE_NAME = "budgety_v3.db"
@@ -32,13 +30,6 @@ class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME
         private const val COLUMN_INCOME_AMOUNT = "amount"
         private const val COLUMN_INCOME_DATETIME = "datetime"
 
-        // BAGONG TABLE PARA SA FULL HISTORY (AUDIT LOGS)
-        private const val TABLE_AUDIT_LOGS = "audit_logs"
-        private const val COLUMN_AUDIT_ID = "id"
-        private const val COLUMN_AUDIT_USER_ID = "user_id"
-        private const val COLUMN_AUDIT_ACTION = "action" // ADDED, EDITED, DELETED
-        private const val COLUMN_AUDIT_DETAILS = "details"
-        private const val COLUMN_AUDIT_DATE = "date"
     }
 
     override fun onCreate(db: SQLiteDatabase) {
@@ -60,17 +51,9 @@ class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME
                 + "$COLUMN_INCOME_AMOUNT REAL, "
                 + "$COLUMN_INCOME_DATETIME TEXT)")
 
-        val createAuditLogs = ("CREATE TABLE $TABLE_AUDIT_LOGS ("
-                + "$COLUMN_AUDIT_ID INTEGER PRIMARY KEY AUTOINCREMENT, "
-                + "$COLUMN_AUDIT_USER_ID INTEGER, "
-                + "$COLUMN_AUDIT_ACTION TEXT, "
-                + "$COLUMN_AUDIT_DETAILS TEXT, "
-                + "$COLUMN_AUDIT_DATE TEXT)")
-
         db.execSQL(createUsers)
         db.execSQL(createExpenses)
         db.execSQL(createIncomes)
-        db.execSQL(createAuditLogs)
 
         val values = ContentValues().apply { put(COLUMN_USER_NAME, "Main Account") }
         db.insert(TABLE_USERS, null, values)
@@ -80,20 +63,7 @@ class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME
         db.execSQL("DROP TABLE IF EXISTS $TABLE_USERS")
         db.execSQL("DROP TABLE IF EXISTS $TABLE_EXPENSES")
         db.execSQL("DROP TABLE IF EXISTS $TABLE_INCOMES")
-        db.execSQL("DROP TABLE IF EXISTS $TABLE_AUDIT_LOGS")
         onCreate(db)
-    }
-
-    // --- INTERNAL AUDIT LOG FUNCTION ---
-    private fun addAuditLog(db: SQLiteDatabase, userId: Int, action: String, details: String) {
-        val currentDate = SimpleDateFormat("yyyy-MM-dd hh:mm a", Locale.getDefault()).format(Date())
-        val values = ContentValues().apply {
-            put(COLUMN_AUDIT_USER_ID, userId)
-            put(COLUMN_AUDIT_ACTION, action)
-            put(COLUMN_AUDIT_DETAILS, details)
-            put(COLUMN_AUDIT_DATE, currentDate)
-        }
-        db.insert(TABLE_AUDIT_LOGS, null, values)
     }
 
     // ==========================================
@@ -143,7 +113,7 @@ class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME
         }
         val success = db.insert(TABLE_EXPENSES, null, values) != -1L
         if (success) {
-            addAuditLog(db, userId, "EXPENSE ADDED", "Added expense: $title (-₱$amount)")
+            auditLogDatabase.addAuditLog(userId, "EXPENSE ADDED", "Added expense: $title (-₱$amount)")
         }
         return success
     }
@@ -164,7 +134,7 @@ class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME
         }
         val success = db.update(TABLE_EXPENSES, values, "$COLUMN_EXPENSE_ID=?", arrayOf(id.toString())) > 0
         if (success && userId != -1) {
-            addAuditLog(db, userId, "EXPENSE EDITED", "Edited expense: $title (New amount: -₱$amount)")
+            auditLogDatabase.addAuditLog(userId, "EXPENSE EDITED", "Edited expense: $title (New amount: -₱$amount)")
         }
         return success
     }
@@ -186,7 +156,7 @@ class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME
 
         val success = db.delete(TABLE_EXPENSES, "$COLUMN_EXPENSE_ID=?", arrayOf(id.toString())) > 0
         if (success && userId != -1) {
-            addAuditLog(db, userId, "EXPENSE DELETED", "Deleted expense: $title (-₱$amount)")
+            auditLogDatabase.addAuditLog(userId, "EXPENSE DELETED", "Deleted expense: $title (-₱$amount)")
         }
         return success
     }
@@ -230,7 +200,7 @@ class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME
         }
         val success = db.insert(TABLE_INCOMES, null, values) != -1L
         if (success) {
-            addAuditLog(db, userId, "INCOME ADDED", "Added income: $title (+₱$amount)")
+            auditLogDatabase.addAuditLog(userId, "INCOME ADDED", "Added income: $title (+₱$amount)")
         }
         return success
     }
@@ -250,7 +220,7 @@ class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME
         }
         val success = db.update(TABLE_INCOMES, values, "$COLUMN_INCOME_ID=?", arrayOf(id.toString())) > 0
         if (success && userId != -1) {
-            addAuditLog(db, userId, "INCOME EDITED", "Edited income: $title (New amount: +₱$amount)")
+            auditLogDatabase.addAuditLog(userId, "INCOME EDITED", "Edited income: $title (New amount: +₱$amount)")
         }
         return success
     }
@@ -271,7 +241,7 @@ class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME
 
         val success = db.delete(TABLE_INCOMES, "$COLUMN_INCOME_ID=?", arrayOf(id.toString())) > 0
         if (success && userId != -1) {
-            addAuditLog(db, userId, "INCOME DELETED", "Deleted income: $title (+₱$amount)")
+            auditLogDatabase.addAuditLog(userId, "INCOME DELETED", "Deleted income: $title (+₱$amount)")
         }
         return success
     }
@@ -341,21 +311,4 @@ class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME
         return list
     }
 
-    // BAGO: Fetch Full Audit Logs
-    fun getAuditLogsByUser(userId: Int): List<AuditLog> {
-        val list = ArrayList<AuditLog>()
-        val db = this.readableDatabase
-        val cursor = db.rawQuery("SELECT * FROM $TABLE_AUDIT_LOGS WHERE $COLUMN_AUDIT_USER_ID=? ORDER BY $COLUMN_AUDIT_ID DESC", arrayOf(userId.toString()))
-        if (cursor.moveToFirst()) {
-            do {
-                val id = cursor.getInt(cursor.getColumnIndexOrThrow(COLUMN_AUDIT_ID))
-                val action = cursor.getString(cursor.getColumnIndexOrThrow(COLUMN_AUDIT_ACTION))
-                val details = cursor.getString(cursor.getColumnIndexOrThrow(COLUMN_AUDIT_DETAILS))
-                val date = cursor.getString(cursor.getColumnIndexOrThrow(COLUMN_AUDIT_DATE))
-                list.add(AuditLog(id, userId, action, details, date))
-            } while (cursor.moveToNext())
-        }
-        cursor.close()
-        return list
-    }
 }
