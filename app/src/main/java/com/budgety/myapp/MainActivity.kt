@@ -395,7 +395,7 @@ class MainActivity : AppCompatActivity() {
         button.setImageResource(
             if (darkMode) R.drawable.ic_sun else R.drawable.ic_moon
         )
-        button.setColorFilter(if (darkMode) Color.WHITE else Color.rgb(15, 81, 50))
+        button.setColorFilter(if (darkMode) Color.rgb(212,208,14) else Color.rgb(43,43,43))
         button.contentDescription = if (darkMode) "Switch to light mode" else "Switch to dark mode"
     }
 
