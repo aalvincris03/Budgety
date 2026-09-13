@@ -34,6 +34,7 @@ import android.content.SharedPreferences
 class MainActivity : AppCompatActivity() {
 
     private lateinit var dbHelper: DatabaseHelper
+    private lateinit var auditLogDatabase: AuditLogDatabaseHelper
     private lateinit var drawerLayout: DrawerLayout
 
     // Header Views
@@ -82,6 +83,7 @@ class MainActivity : AppCompatActivity() {
         setContentView(R.layout.activity_main)
 
         dbHelper = DatabaseHelper(this)
+        auditLogDatabase = AuditLogDatabaseHelper(this)
 
         drawerLayout = findViewById(R.id.drawerLayout)
         val btnShowNav = findViewById<ImageButton>(R.id.btnShowNav)
@@ -238,12 +240,10 @@ class MainActivity : AppCompatActivity() {
         listViewDashboardHistory.adapter = dashAdapter
 
         // Full History View
-        val fullTransactions = dbHelper.getAllTransactionsByUser(user.id, currentFilter)
-        val historyAdapter = TransactionAdapter(
+        val fullHistoryLogs = auditLogDatabase.getAuditLogsByUser(user.id, currentFilter)
+        val historyAdapter = AuditLogAdapter(
             this,
-            fullTransactions,
-            onEditClick = { transaction -> handleEditTransaction(transaction) },
-            onDeleteClick = { transaction -> handleDeleteTransaction(transaction) }
+            fullHistoryLogs
         )
         listViewFullHistory.adapter = historyAdapter
 		updateWidget()
