@@ -21,4 +21,13 @@
         android:textColor="#4CAF50"
         android:textSize="20sp"
         android:textStyle="bold" />
+
+    <Button
+        android:id="@+id/widgetBtnQuickAdd"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="+ Expense"
+        android:textSize="12sp"
+        android:minHeight="0dp"
+        android:padding="4dp" />
 </LinearLayout>

@@ -10,7 +10,7 @@ class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME
 
     companion object {
         private const val DATABASE_NAME = "budgety_v3.db"
-        private const val DATABASE_VERSION = 2 // Binago ko sa 2 para mag-update ang database
+        private const val DATABASE_VERSION = 3
 
         private const val TABLE_USERS = "users"
         private const val COLUMN_USER_ID = "id"
@@ -22,6 +22,7 @@ class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME
         private const val COLUMN_EXPENSE_TITLE = "title"
         private const val COLUMN_EXPENSE_AMOUNT = "amount"
         private const val COLUMN_EXPENSE_DATETIME = "datetime"
+        private const val COLUMN_EXPENSE_CATEGORY = "category"
 
         private const val TABLE_INCOMES = "incomes"
         private const val COLUMN_INCOME_ID = "id"
@@ -29,6 +30,15 @@ class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME
         private const val COLUMN_INCOME_TITLE = "title"
         private const val COLUMN_INCOME_AMOUNT = "amount"
         private const val COLUMN_INCOME_DATETIME = "datetime"
+        private const val COLUMN_INCOME_CATEGORY = "category"
+
+        private const val TABLE_DEBTS = "debts"
+        private const val COLUMN_DEBT_ID = "id"
+        private const val COLUMN_DEBT_USER_ID = "user_id"
+        private const val COLUMN_DEBT_NAME = "name"
+        private const val COLUMN_DEBT_AMOUNT = "amount"
+        private const val COLUMN_DEBT_DUE_DATE = "due_date"
+        private const val COLUMN_DEBT_PAID = "paid"
 
     }
 
@@ -42,28 +52,47 @@ class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME
                 + "$COLUMN_EXPENSE_USER_ID INTEGER, "
                 + "$COLUMN_EXPENSE_TITLE TEXT, "
                 + "$COLUMN_EXPENSE_AMOUNT REAL, "
-                + "$COLUMN_EXPENSE_DATETIME TEXT)")
+                + "$COLUMN_EXPENSE_DATETIME TEXT, "
+                + "$COLUMN_EXPENSE_CATEGORY TEXT NOT NULL DEFAULT 'Other')")
 
         val createIncomes = ("CREATE TABLE $TABLE_INCOMES ("
                 + "$COLUMN_INCOME_ID INTEGER PRIMARY KEY AUTOINCREMENT, "
                 + "$COLUMN_INCOME_USER_ID INTEGER, "
                 + "$COLUMN_INCOME_TITLE TEXT, "
                 + "$COLUMN_INCOME_AMOUNT REAL, "
-                + "$COLUMN_INCOME_DATETIME TEXT)")
+                + "$COLUMN_INCOME_DATETIME TEXT, "
+                + "$COLUMN_INCOME_CATEGORY TEXT NOT NULL DEFAULT 'Other')")
+
+        val createDebts = ("CREATE TABLE $TABLE_DEBTS ("
+                + "$COLUMN_DEBT_ID INTEGER PRIMARY KEY AUTOINCREMENT, "
+                + "$COLUMN_DEBT_USER_ID INTEGER NOT NULL, "
+                + "$COLUMN_DEBT_NAME TEXT NOT NULL, "
+                + "$COLUMN_DEBT_AMOUNT REAL NOT NULL, "
+                + "$COLUMN_DEBT_DUE_DATE TEXT, "
+                + "$COLUMN_DEBT_PAID INTEGER NOT NULL DEFAULT 0)")
 
         db.execSQL(createUsers)
         db.execSQL(createExpenses)
         db.execSQL(createIncomes)
+        db.execSQL(createDebts)
 
         val values = ContentValues().apply { put(COLUMN_USER_NAME, "Main Account") }
         db.insert(TABLE_USERS, null, values)
     }
 
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
-        db.execSQL("DROP TABLE IF EXISTS $TABLE_USERS")
-        db.execSQL("DROP TABLE IF EXISTS $TABLE_EXPENSES")
-        db.execSQL("DROP TABLE IF EXISTS $TABLE_INCOMES")
-        onCreate(db)
+        // Migrations are additive so existing accounts and transactions are never lost.
+        if (oldVersion < 3) {
+            db.execSQL("ALTER TABLE $TABLE_EXPENSES ADD COLUMN $COLUMN_EXPENSE_CATEGORY TEXT NOT NULL DEFAULT 'Other'")
+            db.execSQL("ALTER TABLE $TABLE_INCOMES ADD COLUMN $COLUMN_INCOME_CATEGORY TEXT NOT NULL DEFAULT 'Other'")
+            db.execSQL("CREATE TABLE IF NOT EXISTS $TABLE_DEBTS ("
+                    + "$COLUMN_DEBT_ID INTEGER PRIMARY KEY AUTOINCREMENT, "
+                    + "$COLUMN_DEBT_USER_ID INTEGER NOT NULL, "
+                    + "$COLUMN_DEBT_NAME TEXT NOT NULL, "
+                    + "$COLUMN_DEBT_AMOUNT REAL NOT NULL, "
+                    + "$COLUMN_DEBT_DUE_DATE TEXT, "
+                    + "$COLUMN_DEBT_PAID INTEGER NOT NULL DEFAULT 0)")
+        }
     }
 
     // ==========================================
@@ -103,13 +132,15 @@ class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME
     // ==========================================
     //             EXPENSE METHODS
     // ==========================================
-    fun addExpense(userId: Int, title: String, amount: Double, dateTime: String): Boolean {
+    fun addExpense(userId: Int, title: String, amount: Double, dateTime: String,
+                   category: String = ExpenseCategory.OTHER.label): Boolean {
         val db = this.writableDatabase
         val values = ContentValues().apply {
             put(COLUMN_EXPENSE_USER_ID, userId)
             put(COLUMN_EXPENSE_TITLE, title)
             put(COLUMN_EXPENSE_AMOUNT, amount)
             put(COLUMN_EXPENSE_DATETIME, dateTime)
+            put(COLUMN_EXPENSE_CATEGORY, ExpenseCategory.fromStored(category))
         }
         val success = db.insert(TABLE_EXPENSES, null, values) != -1L
         if (success) {
@@ -118,7 +149,8 @@ class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME
         return success
     }
 
-    fun updateExpense(id: Int, title: String, amount: Double, dateTime: String): Boolean {
+    fun updateExpense(id: Int, title: String, amount: Double, dateTime: String,
+                      category: String = ExpenseCategory.OTHER.label): Boolean {
         val db = this.writableDatabase
         
         // Kunin muna ang User ID para sa Audit Log
@@ -131,6 +163,7 @@ class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME
             put(COLUMN_EXPENSE_TITLE, title)
             put(COLUMN_EXPENSE_AMOUNT, amount)
             put(COLUMN_EXPENSE_DATETIME, dateTime)
+            put(COLUMN_EXPENSE_CATEGORY, ExpenseCategory.fromStored(category))
         }
         val success = db.update(TABLE_EXPENSES, values, "$COLUMN_EXPENSE_ID=?", arrayOf(id.toString())) > 0
         if (success && userId != -1) {
@@ -171,7 +204,8 @@ class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME
                 val title = cursor.getString(cursor.getColumnIndexOrThrow(COLUMN_EXPENSE_TITLE))
                 val amount = cursor.getDouble(cursor.getColumnIndexOrThrow(COLUMN_EXPENSE_AMOUNT))
                 val dateTime = cursor.getString(cursor.getColumnIndexOrThrow(COLUMN_EXPENSE_DATETIME))
-                list.add(Expense(id, userId, title, amount, dateTime))
+                val category = cursor.getString(cursor.getColumnIndexOrThrow(COLUMN_EXPENSE_CATEGORY))
+                list.add(Expense(id, userId, title, amount, dateTime, ExpenseCategory.fromStored(category)))
             } while (cursor.moveToNext())
         }
         cursor.close()
@@ -190,13 +224,15 @@ class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME
     // ==========================================
     //              INCOME METHODS
     // ==========================================
-    fun addIncome(userId: Int, title: String, amount: Double, dateTime: String): Boolean {
+    fun addIncome(userId: Int, title: String, amount: Double, dateTime: String,
+                  category: String = ExpenseCategory.OTHER.label): Boolean {
         val db = this.writableDatabase
         val values = ContentValues().apply {
             put(COLUMN_INCOME_USER_ID, userId)
             put(COLUMN_INCOME_TITLE, title)
             put(COLUMN_INCOME_AMOUNT, amount)
             put(COLUMN_INCOME_DATETIME, dateTime)
+            put(COLUMN_INCOME_CATEGORY, ExpenseCategory.fromStored(category))
         }
         val success = db.insert(TABLE_INCOMES, null, values) != -1L
         if (success) {
@@ -205,7 +241,8 @@ class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME
         return success
     }
 
-    fun updateIncome(id: Int, title: String, amount: Double, dateTime: String): Boolean {
+    fun updateIncome(id: Int, title: String, amount: Double, dateTime: String,
+                     category: String = ExpenseCategory.OTHER.label): Boolean {
         val db = this.writableDatabase
         
         var userId = -1
@@ -217,6 +254,7 @@ class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME
             put(COLUMN_INCOME_TITLE, title)
             put(COLUMN_INCOME_AMOUNT, amount)
             put(COLUMN_INCOME_DATETIME, dateTime)
+            put(COLUMN_INCOME_CATEGORY, ExpenseCategory.fromStored(category))
         }
         val success = db.update(TABLE_INCOMES, values, "$COLUMN_INCOME_ID=?", arrayOf(id.toString())) > 0
         if (success && userId != -1) {
@@ -256,7 +294,8 @@ class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME
                 val title = cursor.getString(cursor.getColumnIndexOrThrow(COLUMN_INCOME_TITLE))
                 val amount = cursor.getDouble(cursor.getColumnIndexOrThrow(COLUMN_INCOME_AMOUNT))
                 val dateTime = cursor.getString(cursor.getColumnIndexOrThrow(COLUMN_INCOME_DATETIME))
-                list.add(Income(id, userId, title, amount, dateTime))
+                val category = cursor.getString(cursor.getColumnIndexOrThrow(COLUMN_INCOME_CATEGORY))
+                list.add(Income(id, userId, title, amount, dateTime, ExpenseCategory.fromStored(category)))
             } while (cursor.moveToNext())
         }
         cursor.close()
@@ -287,7 +326,9 @@ class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME
                     val title = cursorIncome.getString(cursorIncome.getColumnIndexOrThrow(COLUMN_INCOME_TITLE))
                     val amount = cursorIncome.getDouble(cursorIncome.getColumnIndexOrThrow(COLUMN_INCOME_AMOUNT))
                     val dateTime = cursorIncome.getString(cursorIncome.getColumnIndexOrThrow(COLUMN_INCOME_DATETIME))
-                    list.add(Transaction(id, userId, title, amount, dateTime, TransactionType.INCOME))
+                    val category = cursorIncome.getString(cursorIncome.getColumnIndexOrThrow(COLUMN_INCOME_CATEGORY))
+                    list.add(Transaction(id, userId, title, amount, dateTime, TransactionType.INCOME,
+                        ExpenseCategory.fromStored(category)))
                 } while (cursorIncome.moveToNext())
             }
             cursorIncome.close()
@@ -301,7 +342,9 @@ class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME
                     val title = cursorExpense.getString(cursorExpense.getColumnIndexOrThrow(COLUMN_EXPENSE_TITLE))
                     val amount = cursorExpense.getDouble(cursorExpense.getColumnIndexOrThrow(COLUMN_EXPENSE_AMOUNT))
                     val dateTime = cursorExpense.getString(cursorExpense.getColumnIndexOrThrow(COLUMN_EXPENSE_DATETIME))
-                    list.add(Transaction(id, userId, title, amount, dateTime, TransactionType.EXPENSE))
+                    val category = cursorExpense.getString(cursorExpense.getColumnIndexOrThrow(COLUMN_EXPENSE_CATEGORY))
+                    list.add(Transaction(id, userId, title, amount, dateTime, TransactionType.EXPENSE,
+                        ExpenseCategory.fromStored(category)))
                 } while (cursorExpense.moveToNext())
             }
             cursorExpense.close()
@@ -309,6 +352,61 @@ class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME
 
         list.sortByDescending { it.id }
         return list
+    }
+
+    /** Restores a transaction deleted in the current session (used by Undo). */
+    fun restoreTransaction(transaction: Transaction): Boolean {
+        val db = writableDatabase
+        val table = if (transaction.type == TransactionType.INCOME) TABLE_INCOMES else TABLE_EXPENSES
+        val values = ContentValues().apply {
+            put(if (transaction.type == TransactionType.INCOME) COLUMN_INCOME_ID else COLUMN_EXPENSE_ID, transaction.id)
+            put(if (transaction.type == TransactionType.INCOME) COLUMN_INCOME_USER_ID else COLUMN_EXPENSE_USER_ID, transaction.userId)
+            put(if (transaction.type == TransactionType.INCOME) COLUMN_INCOME_TITLE else COLUMN_EXPENSE_TITLE, transaction.title)
+            put(if (transaction.type == TransactionType.INCOME) COLUMN_INCOME_AMOUNT else COLUMN_EXPENSE_AMOUNT, transaction.amount)
+            put(if (transaction.type == TransactionType.INCOME) COLUMN_INCOME_DATETIME else COLUMN_EXPENSE_DATETIME, transaction.dateTime)
+            put(if (transaction.type == TransactionType.INCOME) COLUMN_INCOME_CATEGORY else COLUMN_EXPENSE_CATEGORY, transaction.category)
+        }
+        return db.insertWithOnConflict(table, null, values, SQLiteDatabase.CONFLICT_IGNORE) != -1L
+    }
+
+    fun addDebt(userId: Int, name: String, amount: Double, dueDate: String?): Boolean {
+        val values = ContentValues().apply {
+            put(COLUMN_DEBT_USER_ID, userId)
+            put(COLUMN_DEBT_NAME, name)
+            put(COLUMN_DEBT_AMOUNT, amount)
+            put(COLUMN_DEBT_DUE_DATE, dueDate)
+        }
+        return writableDatabase.insert(TABLE_DEBTS, null, values) != -1L
+    }
+
+    fun setDebtPaid(id: Int, paid: Boolean): Boolean {
+        val values = ContentValues().apply { put(COLUMN_DEBT_PAID, if (paid) 1 else 0) }
+        return writableDatabase.update(TABLE_DEBTS, values, "$COLUMN_DEBT_ID=?",
+            arrayOf(id.toString())) > 0
+    }
+
+    fun deleteDebt(id: Int): Boolean =
+        writableDatabase.delete(TABLE_DEBTS, "$COLUMN_DEBT_ID=?", arrayOf(id.toString())) > 0
+
+    fun getDebtsByUser(userId: Int): List<Debt> {
+        val result = ArrayList<Debt>()
+        val cursor = readableDatabase.rawQuery(
+            "SELECT * FROM $TABLE_DEBTS WHERE $COLUMN_DEBT_USER_ID=? ORDER BY $COLUMN_DEBT_PAID ASC, $COLUMN_DEBT_ID DESC",
+            arrayOf(userId.toString())
+        )
+        cursor.use {
+            while (it.moveToNext()) {
+                result.add(Debt(
+                    it.getInt(it.getColumnIndexOrThrow(COLUMN_DEBT_ID)),
+                    userId,
+                    it.getString(it.getColumnIndexOrThrow(COLUMN_DEBT_NAME)),
+                    it.getDouble(it.getColumnIndexOrThrow(COLUMN_DEBT_AMOUNT)),
+                    it.getString(it.getColumnIndexOrThrow(COLUMN_DEBT_DUE_DATE)),
+                    it.getInt(it.getColumnIndexOrThrow(COLUMN_DEBT_PAID)) == 1
+                ))
+            }
+        }
+        return result
     }
 
 }

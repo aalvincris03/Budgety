@@ -21,9 +21,11 @@ class BudgetWidgetProvider : AppWidgetProvider() {
             val totalIncome = dbHelper.getTotalIncomeByUser(1)
             val totalExpense = dbHelper.getTotalExpensesByUser(1)
             val balance = totalIncome - totalExpense
+            val hidden = context.getSharedPreferences("BudgetAppPrefs", Context.MODE_PRIVATE)
+                .getBoolean("HIDE_AMOUNTS", false)
 
             val views = RemoteViews(context.packageName, R.layout.widget_budget)
-            views.setTextViewText(R.id.widgetTvBalance, String.format("₱%.2f", balance))
+            views.setTextViewText(R.id.widgetTvBalance, if (hidden) "••••" else String.format("₱%.2f", balance))
 
             // Para mag-open ang MainActivity kapag pinindot ang widget
             val intent = Intent(context, MainActivity::class.java)
@@ -32,6 +34,15 @@ class BudgetWidgetProvider : AppWidgetProvider() {
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
             views.setOnClickPendingIntent(R.id.widgetTvBalance, pendingIntent)
+            val quickAddIntent = Intent(context, MainActivity::class.java).apply {
+                action = MainActivity.ACTION_QUICK_ADD_EXPENSE
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            }
+            val quickAddPendingIntent = PendingIntent.getActivity(
+                context, 1, quickAddIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+            views.setOnClickPendingIntent(R.id.widgetBtnQuickAdd, quickAddPendingIntent)
 
             appWidgetManager.updateAppWidget(appWidgetId, views)
         }

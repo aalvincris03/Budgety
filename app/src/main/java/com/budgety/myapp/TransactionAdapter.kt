@@ -8,12 +8,14 @@ import android.view.ViewGroup
 import android.widget.ArrayAdapter
 import android.widget.ImageView
 import android.widget.TextView
+import java.util.Locale
 
 class TransactionAdapter(
     context: Context,
     transactions: List<Transaction>,
     private val onEditClick: (Transaction) -> Unit,
-    private val onDeleteClick: (Transaction) -> Unit
+    private val onDeleteClick: (Transaction) -> Unit,
+    private val amountsHidden: Boolean = false
 ) : ArrayAdapter<Transaction>(context, 0, transactions) {
 
     override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
@@ -34,16 +36,15 @@ class TransactionAdapter(
         if (item != null) {
             tvTitle.text = item.title
             tvDateTime.text = item.dateTime
+            tvTag.text = if (item.type == TransactionType.INCOME) "INCOME" else item.category.toUpperCase(Locale.getDefault())
 
             if (item.type == TransactionType.INCOME) {
-                tvAmount.text = String.format("+₱%.2f", item.amount)
+                tvAmount.text = if (amountsHidden) "••••" else String.format("+₱%.2f", item.amount)
                 tvAmount.setTextColor(Color.parseColor("#059669"))
-                tvTag.text = "INCOME"
                 tvTag.setTextColor(Color.parseColor("#059669"))
             } else {
-                tvAmount.text = String.format("-₱%.2f", item.amount)
+                tvAmount.text = if (amountsHidden) "••••" else String.format("-₱%.2f", item.amount)
                 tvAmount.setTextColor(Color.parseColor("#DC2626"))
-                tvTag.text = "EXPENSE"
                 tvTag.setTextColor(Color.parseColor("#DC2626"))
             }
 
