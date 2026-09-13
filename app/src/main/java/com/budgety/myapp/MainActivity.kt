@@ -53,11 +53,15 @@ class MainActivity : AppCompatActivity() {
     private lateinit var btnNavDashboard: TextView
     private lateinit var btnNavUser: TextView
     private lateinit var btnNavHistory: TextView
+    private lateinit var btnNavChart: TextView
+    private lateinit var btnNavDebt: TextView
 
     // Layout Containers
     private lateinit var viewDashboard: View
     private lateinit var viewUser: View
     private lateinit var viewHistory: View
+    private lateinit var viewChart: View
+    private lateinit var viewDebt: View
 
     // Dashboard Views
     private lateinit var tvTotalIncome: TextView
@@ -77,12 +81,10 @@ class MainActivity : AppCompatActivity() {
     private lateinit var listViewFullHistory: ListView
     private lateinit var etTransactionSearch: EditText
     private lateinit var spinnerSort: Spinner
-    private lateinit var spinnerDateRange: Spinner
     private lateinit var btnStartDate: Button
     private lateinit var btnEndDate: Button
     private lateinit var tvReportSummary: TextView
     private lateinit var categoryBarChart: BarChartView
-    private lateinit var btnDebtTracker: Button
 
     private var userList: List<User> = ArrayList()
     private var activeUser: User? = null
@@ -121,10 +123,14 @@ class MainActivity : AppCompatActivity() {
         btnNavDashboard = findViewById(R.id.btnNavDashboard)
         btnNavUser = findViewById(R.id.btnNavUser)
         btnNavHistory = findViewById(R.id.btnNavHistory)
+        btnNavChart = findViewById(R.id.btnNavChart)
+        btnNavDebt = findViewById(R.id.btnNavDebt)
 
         viewDashboard = findViewById(R.id.viewDashboard)
         viewUser = findViewById(R.id.viewUser)
         viewHistory = findViewById(R.id.viewHistory)
+        viewChart = findViewById(R.id.viewChart)
+        viewDebt = findViewById(R.id.viewDebt)
 
         // Dashboard Elements
         tvTotalIncome = findViewById(R.id.tvTotalIncome)
@@ -146,12 +152,10 @@ class MainActivity : AppCompatActivity() {
         listViewFullHistory = findViewById(R.id.listViewFullHistory)
         etTransactionSearch = findViewById(R.id.etTransactionSearch)
         spinnerSort = findViewById(R.id.spinnerSort)
-        spinnerDateRange = findViewById(R.id.spinnerDateRange)
         btnStartDate = findViewById(R.id.btnStartDate)
         btnEndDate = findViewById(R.id.btnEndDate)
         tvReportSummary = findViewById(R.id.tvReportSummary)
         categoryBarChart = findViewById(R.id.categoryBarChart)
-        btnDebtTracker = findViewById(R.id.btnDebtTracker)
 
         // Drawer Show / Hide Controls
         btnShowNav.setOnClickListener { drawerLayout.openDrawer(GravityCompat.START) }
@@ -161,6 +165,8 @@ class MainActivity : AppCompatActivity() {
         btnNavDashboard.setOnClickListener { switchTab(viewDashboard) }
         btnNavUser.setOnClickListener { switchTab(viewUser) }
         btnNavHistory.setOnClickListener { switchTab(viewHistory) }
+        btnNavChart.setOnClickListener { switchTab(viewChart) }
+        btnNavDebt.setOnClickListener { switchTab(viewDebt) }
 
         // Quick Add buttons on Dashboard
         btnDashAddIncome.setOnClickListener { showIncomeDialog(null) }
@@ -171,33 +177,30 @@ class MainActivity : AppCompatActivity() {
         btnRenameUser.setOnClickListener { showRenameDialog() } 
         btnBackToHome.setOnClickListener { switchTab(viewDashboard) } // <-- 3. Idinagdag ang OnClickListener dito
         amountsHidden = sharedPreferences.getBoolean("HIDE_AMOUNTS", false)
-        findViewById<TextView>(R.id.btnToggleAmounts).setOnClickListener {
+        val btnToggleAmounts = findViewById<ImageButton>(R.id.btnToggleAmounts)
+        btnToggleAmounts.setOnClickListener {
             amountsHidden = !amountsHidden
             sharedPreferences.edit().putBoolean("HIDE_AMOUNTS", amountsHidden).apply()
+            updateAmountVisibilityIcon(btnToggleAmounts)
             loadData()
         }
-        findViewById<TextView>(R.id.btnToggleDarkMode).setOnClickListener {
+        updateAmountVisibilityIcon(btnToggleAmounts)
+
+        val btnToggleDarkMode = findViewById<ImageButton>(R.id.btnToggleDarkMode)
+        btnToggleDarkMode.setOnClickListener {
             val dark = sharedPreferences.getBoolean("DARK_MODE", false).not()
             sharedPreferences.edit().putBoolean("DARK_MODE", dark).apply()
+            updateDarkModeIcon(btnToggleDarkMode, dark)
             AppCompatDelegate.setDefaultNightMode(
                 if (dark) AppCompatDelegate.MODE_NIGHT_YES else AppCompatDelegate.MODE_NIGHT_NO
             )
         }
+        updateDarkModeIcon(btnToggleDarkMode, sharedPreferences.getBoolean("DARK_MODE", false))
 
         val sortOptions = arrayOf("Newest", "Oldest", "Highest amount", "Lowest amount", "Category")
         spinnerSort.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, sortOptions)
-        val rangeOptions = arrayOf("Any date", "This week", "This month", "Custom range")
-        spinnerDateRange.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, rangeOptions)
         spinnerSort.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
             override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) = loadData()
-            override fun onNothingSelected(parent: AdapterView<*>?) {}
-        }
-        spinnerDateRange.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
-            override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
-                if (position == 1 || position == 2) setRelativeDateRange(position == 1)
-                if (position == 0) { startDate = null; endDate = null }
-                if (position != 3) loadData()
-            }
             override fun onNothingSelected(parent: AdapterView<*>?) {}
         }
         etTransactionSearch.addTextChangedListener(object : TextWatcher {
@@ -207,7 +210,7 @@ class MainActivity : AppCompatActivity() {
         })
         btnStartDate.setOnClickListener { chooseDate(true) }
         btnEndDate.setOnClickListener { chooseDate(false) }
-        btnDebtTracker.setOnClickListener { showDebtTracker() }
+        findViewById<Button>(R.id.btnOpenDebtTracker).setOnClickListener { showDebtTracker() }
 
         // History Filter Toggle
         toggleHistoryFilter.addOnButtonCheckedListener { _, checkedId, isChecked ->
@@ -230,6 +233,8 @@ class MainActivity : AppCompatActivity() {
         viewDashboard.visibility = View.GONE
         viewUser.visibility = View.GONE
         viewHistory.visibility = View.GONE
+        viewChart.visibility = View.GONE
+        viewDebt.visibility = View.GONE
 
         targetView.visibility = View.VISIBLE
         drawerLayout.closeDrawer(GravityCompat.START)
@@ -353,16 +358,19 @@ class MainActivity : AppCompatActivity() {
                 date <= (endDate?.timeInMillis ?: Long.MAX_VALUE)
     }
 
-    private fun setRelativeDateRange(week: Boolean) {
-        val now = Calendar.getInstance()
-        val start = now.clone() as Calendar
-        if (week) start.add(Calendar.DAY_OF_YEAR, -6) else start.set(Calendar.DAY_OF_MONTH, 1)
-        start.set(Calendar.HOUR_OF_DAY, 0); start.set(Calendar.MINUTE, 0)
-        start.set(Calendar.SECOND, 0); start.set(Calendar.MILLISECOND, 0)
-        val end = now.clone() as Calendar
-        end.set(Calendar.HOUR_OF_DAY, 23); end.set(Calendar.MINUTE, 59)
-        end.set(Calendar.SECOND, 59); end.set(Calendar.MILLISECOND, 999)
-        startDate = start; endDate = end
+    private fun updateAmountVisibilityIcon(button: ImageButton) {
+        button.setImageResource(
+            if (amountsHidden) R.drawable.ic_eye_closed
+            else R.drawable.ic_eye_open
+        )
+        button.contentDescription = if (amountsHidden) "Show amounts" else "Hide amounts"
+    }
+
+    private fun updateDarkModeIcon(button: ImageButton, darkMode: Boolean) {
+        button.setImageResource(
+            if (darkMode) R.drawable.ic_sun else R.drawable.ic_moon
+        )
+        button.contentDescription = if (darkMode) "Switch to light mode" else "Switch to dark mode"
     }
 
     private fun chooseDate(isStart: Boolean) {
