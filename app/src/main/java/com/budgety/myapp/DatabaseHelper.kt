@@ -43,11 +43,19 @@ class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME
     }
 
     override fun onCreate(db: SQLiteDatabase) {
-        val createUsers = ("CREATE TABLE $TABLE_USERS ("
+        ensureSchema(db)
+    }
+
+    override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
+        ensureSchema(db)
+    }
+
+    private fun ensureSchema(db: SQLiteDatabase) {
+        val createUsers = ("CREATE TABLE IF NOT EXISTS $TABLE_USERS ("
                 + "$COLUMN_USER_ID INTEGER PRIMARY KEY AUTOINCREMENT, "
                 + "$COLUMN_USER_NAME TEXT UNIQUE)")
 
-        val createExpenses = ("CREATE TABLE $TABLE_EXPENSES ("
+        val createExpenses = ("CREATE TABLE IF NOT EXISTS $TABLE_EXPENSES ("
                 + "$COLUMN_EXPENSE_ID INTEGER PRIMARY KEY AUTOINCREMENT, "
                 + "$COLUMN_EXPENSE_USER_ID INTEGER, "
                 + "$COLUMN_EXPENSE_TITLE TEXT, "
@@ -55,7 +63,7 @@ class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME
                 + "$COLUMN_EXPENSE_DATETIME TEXT, "
                 + "$COLUMN_EXPENSE_CATEGORY TEXT NOT NULL DEFAULT 'Other')")
 
-        val createIncomes = ("CREATE TABLE $TABLE_INCOMES ("
+        val createIncomes = ("CREATE TABLE IF NOT EXISTS $TABLE_INCOMES ("
                 + "$COLUMN_INCOME_ID INTEGER PRIMARY KEY AUTOINCREMENT, "
                 + "$COLUMN_INCOME_USER_ID INTEGER, "
                 + "$COLUMN_INCOME_TITLE TEXT, "
@@ -63,7 +71,7 @@ class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME
                 + "$COLUMN_INCOME_DATETIME TEXT, "
                 + "$COLUMN_INCOME_CATEGORY TEXT NOT NULL DEFAULT 'Other')")
 
-        val createDebts = ("CREATE TABLE $TABLE_DEBTS ("
+        val createDebts = ("CREATE TABLE IF NOT EXISTS $TABLE_DEBTS ("
                 + "$COLUMN_DEBT_ID INTEGER PRIMARY KEY AUTOINCREMENT, "
                 + "$COLUMN_DEBT_USER_ID INTEGER NOT NULL, "
                 + "$COLUMN_DEBT_NAME TEXT NOT NULL, "
@@ -76,23 +84,34 @@ class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME
         db.execSQL(createIncomes)
         db.execSQL(createDebts)
 
-        val values = ContentValues().apply { put(COLUMN_USER_NAME, "Main Account") }
-        db.insert(TABLE_USERS, null, values)
+        addColumnIfMissing(db, TABLE_EXPENSES, COLUMN_EXPENSE_CATEGORY, "TEXT NOT NULL DEFAULT 'Other'")
+        addColumnIfMissing(db, TABLE_INCOMES, COLUMN_INCOME_CATEGORY, "TEXT NOT NULL DEFAULT 'Other'")
+
+        val countCursor = db.rawQuery("SELECT COUNT(*) FROM $TABLE_USERS", null)
+        try {
+            if (countCursor.moveToFirst() && countCursor.getInt(0) == 0) {
+                val values = ContentValues().apply { put(COLUMN_USER_NAME, "Main Account") }
+                db.insert(TABLE_USERS, null, values)
+            }
+        } finally {
+            countCursor.close()
+        }
     }
 
-    override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
-        // Migrations are additive so existing accounts and transactions are never lost.
-        if (oldVersion < 3) {
-            db.execSQL("ALTER TABLE $TABLE_EXPENSES ADD COLUMN $COLUMN_EXPENSE_CATEGORY TEXT NOT NULL DEFAULT 'Other'")
-            db.execSQL("ALTER TABLE $TABLE_INCOMES ADD COLUMN $COLUMN_INCOME_CATEGORY TEXT NOT NULL DEFAULT 'Other'")
-            db.execSQL("CREATE TABLE IF NOT EXISTS $TABLE_DEBTS ("
-                    + "$COLUMN_DEBT_ID INTEGER PRIMARY KEY AUTOINCREMENT, "
-                    + "$COLUMN_DEBT_USER_ID INTEGER NOT NULL, "
-                    + "$COLUMN_DEBT_NAME TEXT NOT NULL, "
-                    + "$COLUMN_DEBT_AMOUNT REAL NOT NULL, "
-                    + "$COLUMN_DEBT_DUE_DATE TEXT, "
-                    + "$COLUMN_DEBT_PAID INTEGER NOT NULL DEFAULT 0)")
+    private fun addColumnIfMissing(db: SQLiteDatabase, tableName: String, columnName: String, columnDefinition: String) {
+        val cursor = db.rawQuery("PRAGMA table_info($tableName)", null)
+        try {
+            while (cursor.moveToNext()) {
+                val existingColumn = cursor.getString(cursor.getColumnIndexOrThrow("name"))
+                if (existingColumn == columnName) {
+                    return
+                }
+            }
+        } finally {
+            cursor.close()
         }
+
+        db.execSQL("ALTER TABLE $tableName ADD COLUMN $columnName $columnDefinition")
     }
 
     // ==========================================
