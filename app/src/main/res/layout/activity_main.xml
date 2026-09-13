@@ -235,6 +235,7 @@
                         android:hint="Search"
                         android:inputType="text"
                         android:singleLine="true"
+                        android:textSize="11sp"
                         android:drawableStart="@android:drawable/ic_menu_search"
                         android:paddingStart="8dp"
                         android:paddingEnd="8dp" />

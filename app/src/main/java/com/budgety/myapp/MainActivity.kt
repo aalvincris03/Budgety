@@ -36,6 +36,7 @@ import android.content.Intent
 
 import android.content.Context
 import android.content.SharedPreferences
+import android.graphics.Color
 
 class MainActivity : AppCompatActivity() {
     companion object {
@@ -93,6 +94,7 @@ class MainActivity : AppCompatActivity() {
     private var endDate: Calendar? = null
     private var amountsHidden = false
     private var lastDeleted: Transaction? = null
+    private var currentTab = 0
 
     private val dateTimeFormat = SimpleDateFormat("MMMM dd, yyyy - hh:mm a", Locale.ENGLISH)
 	
@@ -188,6 +190,7 @@ class MainActivity : AppCompatActivity() {
 
         val btnToggleDarkMode = findViewById<ImageButton>(R.id.btnToggleDarkMode)
         btnToggleDarkMode.setOnClickListener {
+            sharedPreferences.edit().putInt("CURRENT_TAB", currentTab).apply()
             val dark = sharedPreferences.getBoolean("DARK_MODE", false).not()
             sharedPreferences.edit().putBoolean("DARK_MODE", dark).apply()
             updateDarkModeIcon(btnToggleDarkMode, dark)
@@ -198,14 +201,22 @@ class MainActivity : AppCompatActivity() {
         updateDarkModeIcon(btnToggleDarkMode, sharedPreferences.getBoolean("DARK_MODE", false))
 
         val sortOptions = arrayOf("Newest", "Oldest", "Highest amount", "Lowest amount", "Category")
-        spinnerSort.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, sortOptions)
+        val sortAdapter = ArrayAdapter(this, R.layout.item_spinner_compact, sortOptions)
+        sortAdapter.setDropDownViewResource(R.layout.item_spinner_compact)
+        spinnerSort.adapter = sortAdapter
         spinnerSort.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
-            override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) = loadData()
+            override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
+                clearCustomDateRange()
+                loadData()
+            }
             override fun onNothingSelected(parent: AdapterView<*>?) {}
         }
         etTransactionSearch.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
-            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) = loadData()
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
+                clearCustomDateRange()
+                loadData()
+            }
             override fun afterTextChanged(s: Editable?) = Unit
         })
         btnStartDate.setOnClickListener { chooseDate(true) }
@@ -225,7 +236,13 @@ class MainActivity : AppCompatActivity() {
         }
 		
         setupUserSpinner()
-        switchTab(viewDashboard)
+        when (sharedPreferences.getInt("CURRENT_TAB", 0)) {
+            1 -> switchTab(viewUser)
+            2 -> switchTab(viewHistory)
+            3 -> switchTab(viewChart)
+            4 -> switchTab(viewDebt)
+            else -> switchTab(viewDashboard)
+        }
         if (intent?.action == ACTION_QUICK_ADD_EXPENSE) showExpenseDialog(null)
     }
 
@@ -237,6 +254,14 @@ class MainActivity : AppCompatActivity() {
         viewDebt.visibility = View.GONE
 
         targetView.visibility = View.VISIBLE
+        currentTab = when (targetView) {
+            viewUser -> 1
+            viewHistory -> 2
+            viewChart -> 3
+            viewDebt -> 4
+            else -> 0
+        }
+        sharedPreferences.edit().putInt("CURRENT_TAB", currentTab).apply()
         drawerLayout.closeDrawer(GravityCompat.START)
         loadData()
     }
@@ -370,7 +395,16 @@ class MainActivity : AppCompatActivity() {
         button.setImageResource(
             if (darkMode) R.drawable.ic_sun else R.drawable.ic_moon
         )
+        button.setColorFilter(if (darkMode) Color.WHITE else Color.rgb(15, 81, 50))
         button.contentDescription = if (darkMode) "Switch to light mode" else "Switch to dark mode"
+    }
+
+    private fun clearCustomDateRange() {
+        if (startDate == null && endDate == null) return
+        startDate = null
+        endDate = null
+        btnStartDate.text = "Start date"
+        btnEndDate.text = "End date"
     }
 
     private fun chooseDate(isStart: Boolean) {
