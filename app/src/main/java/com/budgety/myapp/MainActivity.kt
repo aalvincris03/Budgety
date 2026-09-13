@@ -318,7 +318,7 @@ class MainActivity : AppCompatActivity() {
             dashTransactions,
             onEditClick = { transaction -> handleEditTransaction(transaction) },
             onDeleteClick = { transaction -> handleDeleteTransaction(transaction) },
-            amountsHidden = amountsHidden
+            amountsHidden = false
         )
         listViewDashboardHistory.adapter = dashAdapter
         updateReportSummary(allTransactions)
@@ -400,7 +400,12 @@ class MainActivity : AppCompatActivity() {
         fun totalSince(from: Calendar) = transactions.filter {
             it.type == TransactionType.EXPENSE && (parseDate(it.dateTime)?.time ?: 0L) >= from.timeInMillis
         }.sumByDouble { it.amount }
-        tvReportSummary.text = "This week: ${formatAmount(totalSince(week))} spent  •  This month: ${formatAmount(totalSince(month))} spent"
+        tvReportSummary.text = String.format(
+            Locale.ENGLISH,
+            "This week: ₱%.2f spent  •  This month: ₱%.2f spent",
+            totalSince(week),
+            totalSince(month)
+        )
     }
 
     private fun handleEditTransaction(item: Transaction) {
@@ -681,7 +686,7 @@ class MainActivity : AppCompatActivity() {
             debtRows.removeAllViews()
             dbHelper.getDebtsByUser(user.id).forEach { debt ->
                 val row = CheckBox(this).apply {
-                    text = "${debt.name}  ${if (amountsHidden) "••••" else String.format("₱%.2f", debt.amount)}" +
+                    text = "${debt.name}  ${String.format("₱%.2f", debt.amount)}" +
                             (if (debt.dueDate.isNullOrBlank()) "" else " • due ${debt.dueDate}")
                     isChecked = debt.paid
                     setOnCheckedChangeListener { _, checked -> dbHelper.setDebtPaid(debt.id, checked) }

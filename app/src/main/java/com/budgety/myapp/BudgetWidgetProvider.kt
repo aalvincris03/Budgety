@@ -21,11 +21,8 @@ class BudgetWidgetProvider : AppWidgetProvider() {
             val totalIncome = dbHelper.getTotalIncomeByUser(1)
             val totalExpense = dbHelper.getTotalExpensesByUser(1)
             val balance = totalIncome - totalExpense
-            val hidden = context.getSharedPreferences("BudgetAppPrefs", Context.MODE_PRIVATE)
-                .getBoolean("HIDE_AMOUNTS", false)
-
             val views = RemoteViews(context.packageName, R.layout.widget_budget)
-            views.setTextViewText(R.id.widgetTvBalance, if (hidden) "••••" else String.format("₱%.2f", balance))
+            views.setTextViewText(R.id.widgetTvBalance, String.format("₱%.2f", balance))
 
             // Para mag-open ang MainActivity kapag pinindot ang widget
             val intent = Intent(context, MainActivity::class.java)
